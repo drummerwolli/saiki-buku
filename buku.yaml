@@ -21,8 +21,8 @@ SenzaComponents:
   - AppServer:
       Type: Senza::TaupageAutoScalingGroup
       AutoScaling:
-        Minimum: 5
-        Maximum: 5
+        Minimum: 3
+        Maximum: 3
         MetricType: CPU
       HealthCheckType: ELB
       ElasticLoadBalancer: AppLoadBalancer

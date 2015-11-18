@@ -49,6 +49,8 @@ SenzaComponents:
         scalyr_account_key: '{{Arguments.ScalyrAccountKey}}'
         networking: host
         enhanced_cloudwatch_metrics: true
+        application_logrotate_size: 100M
+        application_logrotate_rotate: 4
         environment:
           ZOOKEEPER_STACK_NAME: "{{Arguments.ZookeeperStackName}}"
           ZOOKEEPER_PREFIX: "{{Arguments.ZookeeperPrefix}}"

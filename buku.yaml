@@ -3,12 +3,8 @@ SenzaInfo:
   Parameters:
     - DockerImage:
         Description: "Docker image path with version tag of buku."
-    - MintBucket:
-        Description: "Mint Bucket of buku."
     - ScalyrAccountKey:
         Description: "Scalyr Account Key, necessary for Logging."
-    - ApplicationID:
-        Description: "The Application Id which got registered for buku in Yourturn/Kio."
     - ZookeeperStackName:
         Description: "Which ZooKeeper Stack should be used?"
     - ZookeeperPrefix:
@@ -39,13 +35,11 @@ SenzaComponents:
       IamRoles:
         - Ref: BukuRole
       TaupageConfig:
-        application_id: "{{Arguments.ApplicationID}}"
         runtime: Docker
         source: "{{Arguments.DockerImage}}"
         ports:
           9092: 9092
           8004: 8004
-        mint_bucket: '{{Arguments.MintBucket}}'
         scalyr_account_key: '{{Arguments.ScalyrAccountKey}}'
         networking: host
         enhanced_cloudwatch_metrics: true
@@ -71,13 +65,6 @@ Resources:
           Action: sts:AssumeRole
       Path: /
       Policies:
-      - PolicyName: AmazonS3MintBucketAccess
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-          - Effect: Allow
-            Action: "s3:GetObject"
-            Resource: ["arn:aws:s3:::{{Arguments.MintBucket}}/{{Arguments.ApplicationID}}/*"]
       - PolicyName: AmazonEC2MetadataReadAccess
         PolicyDocument:
           Version: "2012-10-17"

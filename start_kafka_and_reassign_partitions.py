@@ -15,16 +15,25 @@ kafka_dir = os.getenv('KAFKA_DIR')
 logging.basicConfig(level=getattr(logging, 'INFO', None))
 
 try:
-    response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
+    logging.info("Checking if we are on AWS or not ...")
+    response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document', timeout=5)
     json = response.json()
     region = json['region']
 except requests.exceptions.ConnectionError:
+    logging.info("Seems like this is a local environment, we will run now in local mode")
     region = None
 
 zk_conn_str = generate_zk_conn_str.run(os.getenv('ZOOKEEPER_STACK_NAME'), region)
 os.environ['ZOOKEEPER_CONN_STRING'] = zk_conn_str
 
 logging.info("Got ZooKeeper connection string: " + zk_conn_str)
+
+
+def get_remote_config(file, url):
+    logging.info("getting " + file + " file from " + url)
+    file_ = open(file, 'w')
+    file_.write(requests.get(url).text)
+    file_.close
 
 
 def create_broker_properties(zk_conn_str):
@@ -39,6 +48,9 @@ def create_broker_properties(zk_conn_str):
         f.close()
 
     logging.info("Broker properties generated with zk connection str: " + zk_conn_str)
+
+get_remote_config(kafka_dir + "/config/server.properties", os.getenv('SERVER_PROPERTIES'))
+get_remote_config(kafka_dir + "/config/log4j.properties", os.getenv('LOG4J_PROPERTIES'))
 
 create_broker_properties(zk_conn_str)
 broker_id = find_out_own_id.run()

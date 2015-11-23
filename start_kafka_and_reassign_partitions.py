@@ -27,6 +27,13 @@ os.environ['ZOOKEEPER_CONN_STRING'] = zk_conn_str
 logging.info("Got ZooKeeper connection string: " + zk_conn_str)
 
 
+def get_remote_config(file, url):
+    logging.info("getting " + file + " file from " + url)
+    file_ = open(file, 'w')
+    file_.write(requests.get(url).text)
+    file_.close
+
+
 def create_broker_properties(zk_conn_str):
     with open(kafka_dir + '/config/server.properties', "r+") as f:
         lines = f.read().splitlines()
@@ -39,6 +46,9 @@ def create_broker_properties(zk_conn_str):
         f.close()
 
     logging.info("Broker properties generated with zk connection str: " + zk_conn_str)
+
+get_remote_config(kafka_dir + "/config/server.properties", os.getenv('SERVER_PROPERTIES'))
+get_remote_config(kafka_dir + "/config/log4j.properties", os.getenv('LOG4J_PROPERTIES'))
 
 create_broker_properties(zk_conn_str)
 broker_id = find_out_own_id.run()

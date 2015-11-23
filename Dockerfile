@@ -32,6 +32,8 @@ ADD wait_for_kafka_startup.py /tmp/wait_for_kafka_startup.py
 ADD generate_zk_conn_str.py /tmp/generate_zk_conn_str.py
 RUN chmod 777 /tmp/start_kafka_and_reassign_partitions.py
 
+ADD scm-source.json /scm-source.json
+
 CMD /usr/bin/env python3 -u /tmp/start_kafka_and_reassign_partitions.py
 
 EXPOSE 9092 8004

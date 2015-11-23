@@ -15,10 +15,12 @@ kafka_dir = os.getenv('KAFKA_DIR')
 logging.basicConfig(level=getattr(logging, 'INFO', None))
 
 try:
-    response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
+    logging.info("Checking if we are on AWS or not ...")
+    response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document', timeout=5)
     json = response.json()
     region = json['region']
 except requests.exceptions.ConnectionError:
+    logging.info("Seems like this is a local environment, we will run now in local mode")
     region = None
 
 zk_conn_str = generate_zk_conn_str.run(os.getenv('ZOOKEEPER_STACK_NAME'), region)

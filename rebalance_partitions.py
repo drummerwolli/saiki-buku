@@ -5,6 +5,8 @@ import json
 import os
 import wait_for_kafka_startup
 
+from kazoo.protocol.states import EventType
+
 
 class NotEnoughBrokersException(Exception):
     def __init__(self):
@@ -26,69 +28,68 @@ def state_listener(state):
 
 
 def readout_brokerids(zk):
-    if zk.exists("/brokers/ids"):
+    try:
         return zk.get_children("/brokers/ids")
-    else:
-        print("there are no brokers registrated in this zookeeper cluster, therefore exiting")
+    except NoNodeError:
+        logging.error("there are no brokers registrated in this zookeeper cluster, therefore exiting")
         exit(1)
 
 
 def readout_topics(zk):
-    if zk.exists("/brokers/topics"):
+    try:
         return zk.get_children("/brokers/topics")
-    else:
-        print("there are no topics registrated in this zookeeper cluster")
-        return None
+    except NoNodeError:
+        logging.info("there are no topics registrated in this zookeeper cluster")
 
 
 def readout_topic_details(zk, topic):
-    if zk.exists("/brokers/topics/" + topic):
+    try:
         return json.loads(zk.get("/brokers/topics/" + topic)[0].decode('utf-8'))
-    else:
-        print("no information for topic " + topic + " existing")
+    except NoNodeError:
+        logging.info("no information for topic %s existing", topic)
 
 
 def readout_partitions(zk, topic):
-    if zk.exists("/brokers/topics/" + topic + "/partitions"):
+    try:
         return zk.get_children("/brokers/topics/" + topic + "/partitions")
-    else:
-        print("there are no partitions for topic " + topic + " in this zookeeper cluster")
-        return None
-
-
-def check_partitions(zk, topic):
-    if zk.exists("/brokers/topics/" + topic + "/partitions"):
-        pass
+    except NoNodeError:
+        logging.info("there are no partitions for topic %s in this zookeeper cluster", topic)
 
 
 def check_for_broken_partitions(zk_dict):
-    brokers = zk_dict['broker']
-    tmp_result = {}
     result = {}
     for topic in zk_dict['topics']:
-        logging.debug("checking topic: " + topic['name'])
-        tmp_result[topic['name']] = {}
-        for partition in topic['partitions']:
-            logging.debug("checking partition: " + str(partition))
-            tmp_result[topic['name']][partition] = {}
-            for part_broker_id in topic['partitions'][partition]:
-                logging.debug("checking if this broker is still existing: " + str(part_broker_id))
-                tmp_result[topic['name']][partition][part_broker_id] = False
-                for existing_broker in brokers:
-                    if int(part_broker_id) == int(existing_broker):
-                        tmp_result[topic['name']][partition][part_broker_id] = True
-                        break
-            for part_broker_not_avail in tmp_result[topic['name']][partition]:
-                if tmp_result[topic['name']][partition][part_broker_not_avail] is False:
+        logging.debug("checking topic: %s", topic['name'])
+        for partition, brokers in topic['partitions'].items():
+            logging.debug("checking partition: %s", partition)
+            for part_broker_id in brokers:
+                logging.debug("checking if this broker is still existing: %s", part_broker_id)
+                if str(part_broker_id) not in zk_dict['broker']:
                     if topic['name'] not in result:
                         result[topic['name']] = {}
-                    result[topic['name']][partition] = part_broker_not_avail
+                    result[topic['name']][partition] = part_broker_id
+                    break
     return result
 
 
 def get_own_ip():
     import requests
     return requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document').json()['privateIp']
+
+
+def update_broker_weigths(weights, brokers):
+    for i, broker in enumerate(reversed(brokers)):
+        if broker in weights:
+            weights[broker] += 2**(i + i)
+
+
+def get_broker_weights(zk_dict, ignore_existing=False):
+    weights = {int(broker): 0 for broker in zk_dict['broker']}
+    if not ignore_existing:
+        for topic in zk_dict['topics']:
+            for brokers in topic['partitions'].values():
+                update_broker_weigths(weights, brokers)
+    return weights
 
 
 def generate_json(zk_dict, replication_factor, broken_topics=False):
@@ -100,16 +101,14 @@ def generate_json(zk_dict, replication_factor, broken_topics=False):
         logging.info("reassigning all topics")
         topics_to_reassign = {}
         for topic in zk_dict['topics']:
+            topics_to_reassign[topic['name']] = {}
             for partition in topic['partitions']:
-                if 'name' not in topics_to_reassign[topic]:
-                    topics_to_reassign[topic['name']] = {}
                 topics_to_reassign[topic['name']][partition] = 0
         ignore_existing = True
     logging.debug("topics_to_reassign:")
     logging.debug(topics_to_reassign)
 
     if len(topics_to_reassign) > 0:
-        logging.debug(topics_to_reassign)
         logging.info("topics_to_reassign found, generating new assignment pattern")
         logging.info("reading out broker id's")
         avail_brokers_init = zk_dict['broker']
@@ -117,121 +116,81 @@ def generate_json(zk_dict, replication_factor, broken_topics=False):
         if len(avail_brokers_init) < replication_factor:
             raise NotEnoughBrokersException
 
-        logging.debug("Available Brokers: " + str(len(avail_brokers_init)))
-        logging.debug("Replication Factor: " + str(replication_factor))
+        logging.debug("Available Brokers: %s", len(avail_brokers_init))
+        logging.debug("Replication Factor: %s", replication_factor)
         final_result = {'version': 1, 'partitions': []}
         logging.info("generating now ")
-        for topic in topics_to_reassign:
-            for partition in topics_to_reassign[topic]:
-                logging.debug("finding new brokers for topic: " + str(topic) + ", partition: " + str(partition))
-                avail_brokers = list(avail_brokers_init)
-                broker_list = []
-                for i in range(0, replication_factor):
-                    broker = get_best_broker(zk_dict, list(avail_brokers), final_result, ignore_existing)
-                    logging.debug("using broker: "
-                                  + broker
-                                  + " for topic: "
-                                  + str(topic)
-                                  + ", partition: "
-                                  + str(partition))
-                    avail_brokers.remove(broker)
-                    logging.debug("available brokers for the rest: " + str(avail_brokers))
-                    broker_list.append(int(broker))
+        weights = get_broker_weights(zk_dict, ignore_existing)
+        for topic, partitions in topics_to_reassign.items():
+            for partition in partitions:
+                logging.debug("finding new brokers for topic: %s, partition: %s", topic, partition)
+                broker_list = [b for b, w in sorted(weights.items(), key=lambda v: v[1])][:replication_factor]
                 final_result['partitions'].append({'topic': topic,
                                                    'partition': int(partition),
                                                    'replicas': broker_list})
+                update_broker_weigths(weights, broker_list)
         return final_result
     else:
         logging.info("no broken topics found")
         return {}
 
 
-def get_broker_weight(zk_dict, new_assignment, broker, ignore_existing=False):
-    broker_weight = 0
-    if ignore_existing is False:
-        for topic in zk_dict['topics']:
-            for partition in topic['partitions']:
-                i = len(topic['partitions'][partition])
-                # every topic gets a weight, based on the position in the array.
-                # first topic is the leader, so its gets the heighest weight
-                for part_broker_id in topic['partitions'][partition]:
-                    if int(part_broker_id) == int(broker):
-                        broker_weight = broker_weight + 2 ** i
-                    i = i - 1
-    # also incorporate the new assignments, which are not yet written in zookeeper
-    for partition_na in new_assignment['partitions']:
-        i = len(partition_na['replicas'])
-        for brokers_na in partition_na['replicas']:
-            # logging.debug(brokers_na)
-            # logging.debug(broker)
-            if int(brokers_na) == int(broker):
-                broker_weight = broker_weight + 2 ** i
-                # logging.debug(broker_weight)
-            i = i - 1
-    return broker_weight
-
-
-def get_best_broker(zk_dict, available_brokers, new_assignment, ignore_existing=False):
-    # logging.debug("new assignment: " + str(new_assignment))
-    if len(available_brokers) == 1:
-        logging.debug("only one broker available: " + str(available_brokers))
-        return available_brokers[0]
-    else:
-        lowest_broker = {'id': 0, 'weight': 0}
-        logging.debug("this brokers are available for this vote: " + str(available_brokers))
-        for broker in available_brokers:
-            logging.debug("getting weight for broker " + str(broker))
-            weight = get_broker_weight(zk_dict, new_assignment, broker, ignore_existing)
-            logging.debug("broker_weight " + str(weight))
-            if lowest_broker['id'] == 0 or lowest_broker['weight'] > weight:
-                lowest_broker['id'] = broker
-                lowest_broker['weight'] = weight
-        return lowest_broker['id']
-
-
 def write_json_to_zk(zk, final_result):
+    watcher_event = zk.handler.event_object()
+
+    def reassign_partitions_watcher(event):
+        if event.type == EventType.DELETED:
+            watcher_event.set()
+        else:
+            if zk.exists('/admin/reassign_partitions', reassign_partitions_watcher) is None:
+                watcher_event.set()
+
     logging.info("writing reassigned partitions in ZK")
     count_steps_left = len(final_result['partitions'])
     for step in final_result['partitions']:
         if count_steps_left % 20 == 0 or count_steps_left == len(final_result['partitions']):
-            logging.info("steps left: " + str(count_steps_left))
-        logging.info("trying to write zk node for repairing " + str(step))
-        timeout_count = 0
+            logging.info("steps left: %s", count_steps_left)
+        logging.info("trying to write zk node for repairing %s", step)
         done = False
-        while timeout_count < 1800 and done is False:
+
+        while not done:
             try:
                 zk.create("/admin/reassign_partitions",
-                          json.dumps({'version': 1, 'partitions': [step]}).encode('utf-8'))
+                          json.dumps({'version': 1, 'partitions': [step]}, separators=(',', ':')).encode('utf-8'))
                 done = True
                 logging.info("done")
-                count_steps_left = count_steps_left - 1
-                sleep(0.5)
+                count_steps_left -= 1
+                watcher_event.clear()
+                if zk.exists('/admin/reassign_partitions', reassign_partitions_watcher) is not None:
+                    watcher_event.wait(300)
             except NodeExistsError:
                 try:
-                    check = zk.get("/admin/reassign_partitions")
+                    watcher_event.clear()
+                    check = zk.get("/admin/reassign_partitions", reassign_partitions_watcher)
                     if check[0] == b'{"version": 1, "partitions": []}':
                         zk.delete("/admin/reassign_partitions", recursive=True)
-                    else:
+                        continue
+
+                    for timeout_count in range(0, 6):
                         # only output message every 10mins
-                        if timeout_count % 300 == 0:
-                            logging.info("there seems to be a reassigning already taking place: "
-                                         + str(check[0].decode('utf-8')))
-                            logging.info("waiting ...")
-                        timeout_count = timeout_count + 1
-                        sleep(2)
+                        logging.info("there seems to be a reassigning already taking place: %s",
+                                     check[0].decode('utf-8'))
+                        logging.info("waiting ...")
+                        watcher_event.wait(300)
+                        if watcher_event.isSet():
+                            break
                 except NoNodeError:
                     pass
                     # logging.info("NoNodeError")
-    if done is False:
-        logging.warning("Reassignment was not successfull due to timeout issues of the previous reassignment")
+        if done is False:
+            logging.warning("Reassignment was not successfull due to timeout issues of the previous reassignment")
+            break
 
 
 def get_zk_dict(zk):
-    result = {'topics': [], 'broker': []}
+    result = {'topics': [], 'broker': readout_brokerids(zk)}
     for topic in readout_topics(zk):
         result['topics'].append({'name': topic, 'partitions': readout_topic_details(zk, topic)['partitions']})
-    for broker in readout_brokerids(zk):
-        result['broker'].append(broker)
     return result
 
 
@@ -256,20 +215,16 @@ def run():
     result = generate_json(zk_dict, replication_factor, broken_topics=True)
     if result != {}:
         logging.info("JSON generated")
-        logging.info("there are " + str(len(result['partitions'])) + " partitions to repair")
+        logging.info("there are %s partitions to repair", len(result['partitions']))
         logging.debug(result)
         if os.getenv('WRITE_TO_JSON') != 'no':
             write_json_to_zk(zk, result)
     else:
         logging.info("no JSON generated")
-        needed = True
-        for broker in zk_dict['broker']:
-            if int(get_broker_weight(zk_dict, {'partitions': []}, broker)) == 0:
-                needed = True
-        if needed is True:
+
+        if any(weight == 0 for weight in get_broker_weights(zk_dict).values()):
             result = generate_json(zk_dict, replication_factor, broken_topics=False)
             if result != {}:
-
                 logging.info("JSON generated")
                 if os.getenv('WRITE_TO_JSON') != 'no':
                     write_json_to_zk(zk, result)

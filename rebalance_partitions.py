@@ -3,7 +3,6 @@ from time import sleep
 import logging
 import json
 import os
-import wait_for_kafka_startup
 
 from kazoo.protocol.states import EventType
 
@@ -202,6 +201,7 @@ def connect_to_zk():
 def run():
     replication_factor = 3
 
+    import wait_for_kafka_startup
     logging.info("waiting for kafka to start up")
     if os.getenv('WAIT_FOR_KAFKA') != 'no':
         wait_for_kafka_startup.run(get_own_ip())

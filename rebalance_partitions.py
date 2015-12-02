@@ -58,14 +58,13 @@ def readout_partitions(zk, topic):
 
 def check_for_broken_partitions(zk_dict):
     result = {}
-    brokers = zk_dict['broker']
     for topic in zk_dict['topics']:
         logging.debug("checking topic: %s", topic['name'])
         for partition, brokers in topic['partitions'].items():
             logging.debug("checking partition: %s", partition)
             for part_broker_id in brokers:
                 logging.debug("checking if this broker is still existing: %s", part_broker_id)
-                if str(part_broker_id) not in brokers:
+                if str(part_broker_id) not in zk_dict['broker']:
                     if topic['name'] not in result:
                         result[topic['name']] = {}
                     result[topic['name']][partition] = part_broker_id

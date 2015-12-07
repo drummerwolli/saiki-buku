@@ -3,7 +3,6 @@ from time import sleep
 import logging
 import json
 import os
-import wait_for_kafka_startup
 
 from kazoo.protocol.states import EventType
 
@@ -80,7 +79,7 @@ def get_own_ip():
 def update_broker_weigths(weights, brokers):
     for i, broker in enumerate(reversed(brokers)):
         if broker in weights:
-            weights[broker] += 2**(i + i)
+            weights[broker] += 2 ** (i + i)
 
 
 def get_broker_weights(zk_dict, ignore_existing=False):
@@ -92,14 +91,10 @@ def get_broker_weights(zk_dict, ignore_existing=False):
     return weights
 
 
-def generate_json(zk_dict, replication_factor, broken_topics=False):
+def generate_json(zk_dict, replication_factor, topics_to_reassign={}):
     ignore_existing = False
-    if broken_topics is True:
-        logging.info("checking for broken topics")
-        topics_to_reassign = check_for_broken_partitions(zk_dict)
-    else:
+    if topics_to_reassign == {}:
         logging.info("reassigning all topics")
-        topics_to_reassign = {}
         for topic in zk_dict['topics']:
             topics_to_reassign[topic['name']] = {}
             for partition in topic['partitions']:
@@ -194,9 +189,19 @@ def get_zk_dict(zk):
     return result
 
 
+def connect_to_zk():
+    zookeeper_connect_string = os.getenv('ZOOKEEPER_CONN_STRING')
+    zk = KazooClient(hosts=zookeeper_connect_string)
+    zk.start()
+    zk.add_listener(state_listener)
+    logging.info("connected to Zookeeper")
+    return zk
+
+
 def run():
     replication_factor = 3
-    zookeeper_connect_string = os.getenv('ZOOKEEPER_CONN_STRING')
+
+    import wait_for_kafka_startup
     logging.info("waiting for kafka to start up")
     if os.getenv('WAIT_FOR_KAFKA') != 'no':
         wait_for_kafka_startup.run(get_own_ip())
@@ -205,14 +210,11 @@ def run():
 
     logging.info("kafka port is open, continuing")
 
-    zk = KazooClient(hosts=zookeeper_connect_string)
-    zk.start()
-    zk.add_listener(state_listener)
-
-    logging.info("connected to Zookeeper")
-
+    zk = connect_to_zk()
     zk_dict = get_zk_dict(zk)
-    result = generate_json(zk_dict, replication_factor, broken_topics=True)
+
+    logging.info("checking for broken topics")
+    result = generate_json(zk_dict, replication_factor, topics_to_reassign=check_for_broken_partitions(zk_dict))
     if result != {}:
         logging.info("JSON generated")
         logging.info("there are %s partitions to repair", len(result['partitions']))
@@ -223,7 +225,7 @@ def run():
         logging.info("no JSON generated")
 
         if any(weight == 0 for weight in get_broker_weights(zk_dict).values()):
-            result = generate_json(zk_dict, replication_factor, broken_topics=False)
+            result = generate_json(zk_dict, replication_factor)
             if result != {}:
                 logging.info("JSON generated")
                 if os.getenv('WRITE_TO_JSON') != 'no':

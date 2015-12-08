@@ -40,6 +40,7 @@ SenzaComponents:
         ports:
           9092: 9092
           8004: 8004
+          8080: 8080
         scalyr_account_key: '{{Arguments.ScalyrAccountKey}}'
         networking: host
         enhanced_cloudwatch_metrics: true
@@ -48,6 +49,7 @@ SenzaComponents:
         logs:
           /opt/kafka_2.10-0.8.2.1/logs/
         environment:
+          EXHIBITOR_HOST: "{{Arguments.ZookeeperStackName}}.{{Arguments.HostedZone}}"
           ZOOKEEPER_STACK_NAME: "{{Arguments.ZookeeperStackName}}"
           ZOOKEEPER_PREFIX: "{{Arguments.ZookeeperPrefix}}"
           JMX_PORT: 8004
@@ -94,6 +96,10 @@ Resources:
         - IpProtocol: tcp
           FromPort: 8004
           ToPort: 8004
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
           CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
           FromPort: 22
@@ -145,6 +151,10 @@ Resources:
           InstanceProtocol: TCP
         - InstancePort: 8004
           LoadBalancerPort: 8004
+          Protocol: TCP
+          InstanceProtocol: TCP
+        - InstancePort: 8080
+          LoadBalancerPort: 8080
           Protocol: TCP
           InstanceProtocol: TCP
       SecurityGroups:

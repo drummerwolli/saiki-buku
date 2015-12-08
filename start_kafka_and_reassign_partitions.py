@@ -10,6 +10,8 @@ from multiprocessing import Pool
 import wait_for_kafka_startup
 import generate_zk_conn_str
 
+from health import HealthServer
+
 kafka_dir = os.getenv('KAFKA_DIR')
 
 logging.basicConfig(level=getattr(logging, 'INFO', None))
@@ -101,6 +103,8 @@ def check_broker_id_in_zk(broker_id, process):
                                         + "/bin/kafka-server-start.sh", kafka_dir
                                         + "/config/server.properties"])
             os.environ['WAIT_FOR_KAFKA'] = 'yes'
+
+HealthServer().start()
 
 pool = Pool()
 

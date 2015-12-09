@@ -33,6 +33,8 @@ ADD start_kafka_and_reassign_partitions.py /tmp/start_kafka_and_reassign_partiti
 ADD rebalance_partitions.py /tmp/rebalance_partitions.py
 ADD wait_for_kafka_startup.py /tmp/wait_for_kafka_startup.py
 ADD generate_zk_conn_str.py /tmp/generate_zk_conn_str.py
+ADD zookeeper.py /tmp/zookeeper.py
+ADD health.py /tmp/health.py
 RUN chmod 777 /tmp/start_kafka_and_reassign_partitions.py
 
 ADD scm-source.json /scm-source.json
@@ -42,4 +44,4 @@ RUN chmod 777 /tmp/tail_logs_and_start.sh
 
 CMD /tmp/tail_logs_and_start.sh
 
-EXPOSE 9092 8004
+EXPOSE 9092 8004 8080

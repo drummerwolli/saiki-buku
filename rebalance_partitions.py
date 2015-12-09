@@ -67,7 +67,9 @@ def check_for_broken_partitions(zk_dict):
                     if topic['name'] not in result:
                         result[topic['name']] = {}
                     result[topic['name']][partition] = part_broker_id
+                    logging.debug("no, it isn't ...")
                     break
+                logging.debug("yes, it is ...")
     return result
 
 
@@ -91,10 +93,10 @@ def get_broker_weights(zk_dict, ignore_existing=False):
     return weights
 
 
-def generate_json(zk_dict, replication_factor, topics_to_reassign={}):
+def generate_json(zk_dict, replication_factor, topics_to_reassign="all"):
     ignore_existing = False
-    if topics_to_reassign == {}:
-        logging.info("reassigning all topics")
+    if topics_to_reassign == "all":
+        # logging.info("reassigning all topics")
         for topic in zk_dict['topics']:
             topics_to_reassign[topic['name']] = {}
             for partition in topic['partitions']:
@@ -126,7 +128,6 @@ def generate_json(zk_dict, replication_factor, topics_to_reassign={}):
                 update_broker_weigths(weights, broker_list)
         return final_result
     else:
-        logging.info("no broken topics found")
         return {}
 
 
@@ -216,22 +217,23 @@ def run():
     logging.info("checking for broken topics")
     result = generate_json(zk_dict, replication_factor, topics_to_reassign=check_for_broken_partitions(zk_dict))
     if result != {}:
-        logging.info("JSON generated")
         logging.info("there are %s partitions to repair", len(result['partitions']))
         logging.debug(result)
         if os.getenv('WRITE_TO_JSON') != 'no':
+            logging.info("writing to ZooKeeper ...")
             write_json_to_zk(zk, result)
     else:
-        logging.info("no JSON generated")
+        logging.info("no broken topics found, no JSON generated")
 
         if any(weight == 0 for weight in get_broker_weights(zk_dict).values()):
+            logging.info("there are unused brokers, reassigning all topics ...")
             result = generate_json(zk_dict, replication_factor)
             if result != {}:
                 logging.info("JSON generated")
                 if os.getenv('WRITE_TO_JSON') != 'no':
                     write_json_to_zk(zk, result)
         else:
-            logging.info("no unused Broker found")
+            logging.info("no unused Broker found, no JSON generated")
 
     zk.stop()
     logging.info("exiting")

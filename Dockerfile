@@ -2,7 +2,8 @@ FROM zalando/python:3.5.0-3
 MAINTAINER fabian.wollert@zalando.de teng.qiu@zalando.de
 
 ENV KAFKA_VERSION="0.8.2.1" SCALA_VERSION="2.10"
-ENV KAFKA_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
+ENV KAFKA_TMP_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
+ENV KAFKA_DIR="/opt/kafka"
 
 ENV SERVER_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/server.properties"
 ENV LOG4J_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/log4j.properties"
@@ -10,9 +11,6 @@ ENV LOG4J_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/maste
 RUN apt-get update
 RUN apt-get install wget openjdk-8-jre -y --force-yes
 RUN pip3 install --upgrade kazoo boto3
-
-ENV KAFKA_TMP_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
-ENV KAFKA_DIR="/opt/kafka"
 
 ADD download_kafka.sh /tmp/download_kafka.sh
 RUN chmod 777 /tmp/download_kafka.sh
@@ -25,7 +23,8 @@ RUN mkdir -p /data/kafka-logs
 RUN chmod -R 777 /data/kafka-logs
 
 ADD find_out_own_id.py /tmp/find_out_own_id.py
-#RUN python3 /tmp/find_out_own_id.py -f $KAFKA_DIR/config/server.properties
+
+RUN mkdir -p $KAFKA_DIR/logs/
 
 RUN chmod -R 777 $KAFKA_DIR
 WORKDIR $KAFKA_DIR
@@ -38,6 +37,9 @@ RUN chmod 777 /tmp/start_kafka_and_reassign_partitions.py
 
 ADD scm-source.json /scm-source.json
 
-CMD /usr/bin/env python3 -u /tmp/start_kafka_and_reassign_partitions.py
+ADD tail_logs_and_start.sh /tmp/tail_logs_and_start.sh
+RUN chmod 777 /tmp/tail_logs_and_start.sh
+
+CMD /tmp/tail_logs_and_start.sh
 
 EXPOSE 9092 8004

@@ -45,8 +45,6 @@ SenzaComponents:
         enhanced_cloudwatch_metrics: true
         application_logrotate_size: 100M
         application_logrotate_rotate: 4
-        logs:
-          /opt/kafka_2.10-0.8.2.1/logs/
         environment:
           ZOOKEEPER_STACK_NAME: "{{Arguments.ZookeeperStackName}}"
           ZOOKEEPER_PREFIX: "{{Arguments.ZookeeperPrefix}}"

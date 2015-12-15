@@ -93,7 +93,7 @@ def get_broker_weights(zk_dict, ignore_existing=False):
     return weights
 
 
-def generate_json(zk_dict, replication_factor, topics_to_reassign="all"):
+def generate_json(zk_dict, topics_to_reassign="all"):
     ignore_existing = False
     if topics_to_reassign == "all":
         # logging.info("reassigning all topics")
@@ -105,21 +105,29 @@ def generate_json(zk_dict, replication_factor, topics_to_reassign="all"):
     logging.debug("topics_to_reassign:")
     logging.debug(topics_to_reassign)
 
+    tmp_topic_dict = {}
+    for tmp_topic in zk_dict['topics']:
+        tmp_topic_dict[tmp_topic['name']] = tmp_topic['partitions']
+
     if len(topics_to_reassign) > 0:
         logging.info("topics_to_reassign found, generating new assignment pattern")
         logging.info("reading out broker id's")
         avail_brokers_init = zk_dict['broker']
 
-        if len(avail_brokers_init) < replication_factor:
-            raise NotEnoughBrokersException
-
-        logging.debug("Available Brokers: %s", len(avail_brokers_init))
-        logging.debug("Replication Factor: %s", replication_factor)
         final_result = {'version': 1, 'partitions': []}
         logging.info("generating now ")
         weights = get_broker_weights(zk_dict, ignore_existing)
         for topic, partitions in topics_to_reassign.items():
             for partition in partitions:
+
+                replication_factor = len(tmp_topic_dict[topic][partition])
+
+                logging.debug("Available Brokers: %s", len(avail_brokers_init))
+                logging.debug("Replication Factor: %s", replication_factor)
+
+                if len(avail_brokers_init) < replication_factor:
+                    raise NotEnoughBrokersException
+
                 logging.debug("finding new brokers for topic: %s, partition: %s", topic, partition)
                 broker_list = [b for b, w in sorted(weights.items(), key=lambda v: v[1])][:replication_factor]
                 final_result['partitions'].append({'topic': topic,
@@ -200,8 +208,6 @@ def connect_to_zk():
 
 
 def run():
-    replication_factor = 3
-
     import wait_for_kafka_startup
     logging.info("waiting for kafka to start up")
     if os.getenv('WAIT_FOR_KAFKA') != 'no':
@@ -215,7 +221,7 @@ def run():
     zk_dict = get_zk_dict(zk)
 
     logging.info("checking for broken topics")
-    result = generate_json(zk_dict, replication_factor, topics_to_reassign=check_for_broken_partitions(zk_dict))
+    result = generate_json(zk_dict, topics_to_reassign=check_for_broken_partitions(zk_dict))
     if result != {}:
         logging.info("there are %s partitions to repair", len(result['partitions']))
         logging.debug(result)
@@ -227,9 +233,10 @@ def run():
 
         if any(weight == 0 for weight in get_broker_weights(zk_dict).values()):
             logging.info("there are unused brokers, reassigning all topics ...")
-            result = generate_json(zk_dict, replication_factor)
+            result = generate_json(zk_dict)
             if result != {}:
                 logging.info("JSON generated")
+                logging.debug(result)
                 if os.getenv('WRITE_TO_JSON') != 'no':
                     write_json_to_zk(zk, result)
         else:

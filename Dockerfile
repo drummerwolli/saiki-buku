@@ -1,7 +1,7 @@
 FROM zalando/python:3.5.0-3
 MAINTAINER fabian.wollert@zalando.de teng.qiu@zalando.de
 
-ENV KAFKA_VERSION="0.8.2.1" SCALA_VERSION="2.10"
+ENV KAFKA_VERSION="0.8.2.1" SCALA_VERSION="2.10" JOLOKIA_VERSION="1.3.2"
 ENV KAFKA_TMP_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
 ENV KAFKA_DIR="/opt/kafka"
 
@@ -21,6 +21,8 @@ RUN mv $KAFKA_TMP_DIR $KAFKA_DIR
 
 RUN mkdir -p /data/kafka-logs
 RUN chmod -R 777 /data/kafka-logs
+
+RUN wget -O /tmp/jolokia-jvm-$JOLOKIA_VERSION-agent.jar http://search.maven.org/remotecontent?filepath=org/jolokia/jolokia-jvm/$JOLOKIA_VERSION/jolokia-jvm-$JOLOKIA_VERSION-agent.jar
 
 ADD find_out_own_id.py /tmp/find_out_own_id.py
 

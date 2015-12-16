@@ -5,6 +5,8 @@ import os
 import rebalance_partitions
 import logging
 import requests
+import signal
+import sys
 import find_out_own_id
 from multiprocessing import Pool
 import wait_for_kafka_startup
@@ -123,10 +125,28 @@ os.environ['KAFKA_JMX_OPTS'] = "-Dcom.sun.management.jmxremote=true " \
 kafka_process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
                                   kafka_dir + "/config/server.properties"])
 
-pool.apply_async(check_broker_id_in_zk, [broker_id, kafka_process])
 
-if os.getenv('REASSIGN_PARTITIONS') == 'yes':
-    pool.close()
-    pool.join()
+ignore_sigterm = False
 
-kafka_process.wait()
+
+def sigterm_handler(signo, stack_frame):
+    global ignore_sigterm
+    if not ignore_sigterm:
+        ignore_sigterm = True
+        sys.exit()
+
+
+signal.signal(signal.SIGTERM, sigterm_handler)
+
+
+try:
+    pool.apply_async(check_broker_id_in_zk, [broker_id, kafka_process])
+
+    if os.getenv('REASSIGN_PARTITIONS') == 'yes':
+        pool.close()
+        pool.join()
+
+    kafka_process.wait()
+finally:
+    if ignore_sigterm:
+        kafka_process.terminate()

@@ -14,4 +14,4 @@ tail -f $KAFKA_DIR/logs/log-cleaner.log &
 tail -f $KAFKA_DIR/logs/kafka-request.log &
 tail -f $KAFKA_DIR/logs/state-change.log &
 
-/usr/bin/env python3 -u /tmp/start_kafka_and_reassign_partitions.py
+exec /usr/bin/env python3 -u /tmp/start_kafka_and_reassign_partitions.py

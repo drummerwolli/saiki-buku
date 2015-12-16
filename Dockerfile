@@ -44,6 +44,6 @@ ADD scm-source.json /scm-source.json
 ADD tail_logs_and_start.sh /tmp/tail_logs_and_start.sh
 RUN chmod 777 /tmp/tail_logs_and_start.sh
 
-CMD /tmp/tail_logs_and_start.sh
+ENTRYPOINT ["/bin/bash", "/tmp/tail_logs_and_start.sh"]
 
 EXPOSE 9092 8004 8080

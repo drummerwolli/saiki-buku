@@ -105,9 +105,7 @@ def generate_json(zk_dict, topics_to_reassign="all"):
     logging.debug("topics_to_reassign:")
     logging.debug(topics_to_reassign)
 
-    tmp_topic_dict = {}
-    for tmp_topic in zk_dict['topics']:
-        tmp_topic_dict[tmp_topic['name']] = tmp_topic['partitions']
+    tmp_topic_dict = {t['name']: t['partitions'] for t in zk_dict['topics']}
 
     if len(topics_to_reassign) > 0:
         logging.info("topics_to_reassign found, generating new assignment pattern")

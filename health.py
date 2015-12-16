@@ -1,5 +1,6 @@
 import fcntl
 import json
+import time
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
@@ -26,10 +27,15 @@ class HealthServer(ThreadingMixIn, HTTPServer, Thread):
         self.zk = get_zookeeper()
         self.daemon = True
         self._fetch_brokers = True
+        self._fetch_brokers_time = time.time()
         self._bad_brokers = []
 
     def _brokers_watcher(self, event):
         self._fetch_brokers = True
+
+    @property
+    def fetch_brokers(self):
+        return self._fetch_brokers or time.time() > self._fetch_brokers_time
 
     def _get_brokers(self):
         return self.zk.get_children('/brokers/ids', self._brokers_watcher)
@@ -49,10 +55,11 @@ class HealthServer(ThreadingMixIn, HTTPServer, Thread):
         return list(bad_brokers)
 
     def get_bad_brokers(self):
-        if self._fetch_brokers:
+        if self.fetch_brokers:
             brokers = self._get_brokers()
             self._bad_brokers = self._get_bad_brokers(brokers)
             self._fetch_brokers = False
+            self._fetch_brokers_time = time.time() + 60
         return self._bad_brokers
 
     @staticmethod

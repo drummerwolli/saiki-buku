@@ -84,8 +84,10 @@ def update_broker_weigths(weights, brokers):
             weights[broker] += 2 ** (i + i)
 
 
-def get_broker_weights(zk_dict, ignore_existing=False):
-    weights = {int(broker): 0 for broker in zk_dict['broker']}
+def get_broker_weights(zk_dict, target_brokers="all", ignore_existing=False):
+    if target_brokers == "all":
+        target_brokers = zk_dict['broker']
+    weights = {int(broker): 0 for broker in target_brokers}
     if not ignore_existing:
         for topic in zk_dict['topics']:
             for brokers in topic['partitions'].values():
@@ -93,9 +95,18 @@ def get_broker_weights(zk_dict, ignore_existing=False):
     return weights
 
 
-def generate_json(zk_dict, topics_to_reassign="all"):
+def generate_json(zk_dict, topics_to_reassign="all", target_brokers="all"):
     ignore_existing = False
-    if topics_to_reassign == "all":
+
+    new_broker_ass = False
+    if set(zk_dict['broker']) - set(target_brokers) != set() and target_brokers != "all":
+        avail_brokers_init = target_brokers
+        new_broker_ass = True
+        logging.debug("new broker assignment: " + str(avail_brokers_init))
+    else:
+        avail_brokers_init = zk_dict['broker']
+
+    if topics_to_reassign == "all" or new_broker_ass is True:
         # logging.info("reassigning all topics")
         for topic in zk_dict['topics']:
             topics_to_reassign[topic['name']] = {}
@@ -119,11 +130,10 @@ def generate_json(zk_dict, topics_to_reassign="all"):
     if len(topics_to_reassign) > 0:
         logging.info("topics_to_reassign found, generating new assignment pattern")
         logging.info("reading out broker id's")
-        avail_brokers_init = zk_dict['broker']
 
         final_result = {'version': 1, 'partitions': []}
         logging.info("generating now ")
-        weights = get_broker_weights(zk_dict, ignore_existing)
+        weights = get_broker_weights(zk_dict, avail_brokers_init, ignore_existing)
         for topic, partitions in topics_to_reassign.items():
             for partition in partitions:
 

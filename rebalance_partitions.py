@@ -109,6 +109,13 @@ def generate_json(zk_dict, topics_to_reassign="all"):
     for tmp_topic in zk_dict['topics']:
         tmp_topic_dict[tmp_topic['name']] = tmp_topic['partitions']
 
+    # this is needed for creating new topics (currently in pemetaan)
+    for topic_to_reassign, value in topics_to_reassign.items():
+        if topic_to_reassign not in tmp_topic_dict:
+            tmp_topic_dict[topic_to_reassign] = {}
+            for partition, brokers in value.items():
+                tmp_topic_dict[topic_to_reassign][str(partition)] = brokers
+
     if len(topics_to_reassign) > 0:
         logging.info("topics_to_reassign found, generating new assignment pattern")
         logging.info("reading out broker id's")
@@ -120,7 +127,7 @@ def generate_json(zk_dict, topics_to_reassign="all"):
         for topic, partitions in topics_to_reassign.items():
             for partition in partitions:
 
-                replication_factor = len(tmp_topic_dict[topic][partition])
+                replication_factor = len(tmp_topic_dict[topic][str(partition)])
 
                 logging.debug("Available Brokers: %s", len(avail_brokers_init))
                 logging.debug("Replication Factor: %s", replication_factor)

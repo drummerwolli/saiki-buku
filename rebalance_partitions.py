@@ -67,7 +67,9 @@ def check_for_broken_partitions(zk_dict):
                     if topic['name'] not in result:
                         result[topic['name']] = {}
                     result[topic['name']][partition] = part_broker_id
+                    logging.debug("no, it isn't ...")
                     break
+                logging.debug("yes, it is ...")
     return result
 
 
@@ -82,8 +84,10 @@ def update_broker_weigths(weights, brokers):
             weights[broker] += 2 ** (i + i)
 
 
-def get_broker_weights(zk_dict, ignore_existing=False):
-    weights = {int(broker): 0 for broker in zk_dict['broker']}
+def get_broker_weights(zk_dict, target_brokers="all", ignore_existing=False):
+    if target_brokers == "all":
+        target_brokers = zk_dict['broker']
+    weights = {int(broker): 0 for broker in target_brokers}
     if not ignore_existing:
         for topic in zk_dict['topics']:
             for brokers in topic['partitions'].values():
@@ -91,10 +95,19 @@ def get_broker_weights(zk_dict, ignore_existing=False):
     return weights
 
 
-def generate_json(zk_dict, replication_factor, topics_to_reassign={}):
+def generate_json(zk_dict, topics_to_reassign="all", target_brokers="all"):
     ignore_existing = False
-    if topics_to_reassign == {}:
-        logging.info("reassigning all topics")
+
+    new_broker_ass = False
+    if set(zk_dict['broker']) - set(target_brokers) != set() and target_brokers != "all":
+        avail_brokers_init = target_brokers
+        new_broker_ass = True
+        logging.debug("new broker assignment: " + str(avail_brokers_init))
+    else:
+        avail_brokers_init = zk_dict['broker']
+
+    if topics_to_reassign == "all" or new_broker_ass is True:
+        # logging.info("reassigning all topics")
         for topic in zk_dict['topics']:
             topics_to_reassign[topic['name']] = {}
             for partition in topic['partitions']:
@@ -103,21 +116,35 @@ def generate_json(zk_dict, replication_factor, topics_to_reassign={}):
     logging.debug("topics_to_reassign:")
     logging.debug(topics_to_reassign)
 
+    tmp_topic_dict = {}
+    for tmp_topic in zk_dict['topics']:
+        tmp_topic_dict[tmp_topic['name']] = tmp_topic['partitions']
+
+    # this is needed for creating new topics (currently in pemetaan)
+    for topic_to_reassign, value in topics_to_reassign.items():
+        if topic_to_reassign not in tmp_topic_dict:
+            tmp_topic_dict[topic_to_reassign] = {}
+            for partition, brokers in value.items():
+                tmp_topic_dict[topic_to_reassign][str(partition)] = brokers
+
     if len(topics_to_reassign) > 0:
         logging.info("topics_to_reassign found, generating new assignment pattern")
         logging.info("reading out broker id's")
-        avail_brokers_init = zk_dict['broker']
 
-        if len(avail_brokers_init) < replication_factor:
-            raise NotEnoughBrokersException
-
-        logging.debug("Available Brokers: %s", len(avail_brokers_init))
-        logging.debug("Replication Factor: %s", replication_factor)
         final_result = {'version': 1, 'partitions': []}
         logging.info("generating now ")
-        weights = get_broker_weights(zk_dict, ignore_existing)
+        weights = get_broker_weights(zk_dict, avail_brokers_init, ignore_existing)
         for topic, partitions in topics_to_reassign.items():
             for partition in partitions:
+
+                replication_factor = len(tmp_topic_dict[topic][str(partition)])
+
+                logging.debug("Available Brokers: %s", len(avail_brokers_init))
+                logging.debug("Replication Factor: %s", replication_factor)
+
+                if len(avail_brokers_init) < replication_factor:
+                    raise NotEnoughBrokersException
+
                 logging.debug("finding new brokers for topic: %s, partition: %s", topic, partition)
                 broker_list = [b for b, w in sorted(weights.items(), key=lambda v: v[1])][:replication_factor]
                 final_result['partitions'].append({'topic': topic,
@@ -126,7 +153,6 @@ def generate_json(zk_dict, replication_factor, topics_to_reassign={}):
                 update_broker_weigths(weights, broker_list)
         return final_result
     else:
-        logging.info("no broken topics found")
         return {}
 
 
@@ -199,8 +225,6 @@ def connect_to_zk():
 
 
 def run():
-    replication_factor = 3
-
     import wait_for_kafka_startup
     logging.info("waiting for kafka to start up")
     if os.getenv('WAIT_FOR_KAFKA') != 'no':
@@ -214,24 +238,26 @@ def run():
     zk_dict = get_zk_dict(zk)
 
     logging.info("checking for broken topics")
-    result = generate_json(zk_dict, replication_factor, topics_to_reassign=check_for_broken_partitions(zk_dict))
+    result = generate_json(zk_dict, topics_to_reassign=check_for_broken_partitions(zk_dict))
     if result != {}:
-        logging.info("JSON generated")
         logging.info("there are %s partitions to repair", len(result['partitions']))
         logging.debug(result)
         if os.getenv('WRITE_TO_JSON') != 'no':
+            logging.info("writing to ZooKeeper ...")
             write_json_to_zk(zk, result)
     else:
-        logging.info("no JSON generated")
+        logging.info("no broken topics found, no JSON generated")
 
         if any(weight == 0 for weight in get_broker_weights(zk_dict).values()):
-            result = generate_json(zk_dict, replication_factor)
+            logging.info("there are unused brokers, reassigning all topics ...")
+            result = generate_json(zk_dict)
             if result != {}:
                 logging.info("JSON generated")
+                logging.debug(result)
                 if os.getenv('WRITE_TO_JSON') != 'no':
                     write_json_to_zk(zk, result)
         else:
-            logging.info("no unused Broker found")
+            logging.info("no unused Broker found, no JSON generated")
 
     zk.stop()
     logging.info("exiting")

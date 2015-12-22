@@ -10,6 +10,8 @@ from multiprocessing import Pool
 import wait_for_kafka_startup
 import generate_zk_conn_str
 
+from health import HealthServer
+
 kafka_dir = os.getenv('KAFKA_DIR')
 
 logging.basicConfig(level=getattr(logging, 'INFO', None))
@@ -102,6 +104,8 @@ def check_broker_id_in_zk(broker_id, process):
                                         + "/config/server.properties"])
             os.environ['WAIT_FOR_KAFKA'] = 'yes'
 
+HealthServer().start()
+
 pool = Pool()
 
 if os.getenv('REASSIGN_PARTITIONS') == 'yes':
@@ -109,7 +113,15 @@ if os.getenv('REASSIGN_PARTITIONS') == 'yes':
     pool.apply_async(rebalance_partitions.run)
 
 logging.info("starting kafka server ...")
-kafka_process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh", kafka_dir + "/config/server.properties"])
+os.environ['KAFKA_OPTS'] = "-server " \
+                           + "-Dlog4j.configuration=file:" + kafka_dir + "/config/log4j.properties " \
+                           + "-javaagent:/tmp/jolokia-jvm-" + os.getenv('JOLOKIA_VERSION') + "-agent.jar=host=0.0.0.0"
+# + "-Xmx512M " \
+os.environ['KAFKA_JMX_OPTS'] = "-Dcom.sun.management.jmxremote=true " \
+                               + "-Dcom.sun.management.jmxremote.authenticate=false " \
+                               + "-Dcom.sun.management.jmxremote.ssl=false"
+kafka_process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
+                                  kafka_dir + "/config/server.properties"])
 
 pool.apply_async(check_broker_id_in_zk, [broker_id, kafka_process])
 

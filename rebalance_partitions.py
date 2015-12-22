@@ -108,6 +108,7 @@ def generate_json(zk_dict, topics_to_reassign="all", target_brokers="all"):
 
     if topics_to_reassign == "all" or new_broker_ass is True:
         # logging.info("reassigning all topics")
+        topics_to_reassign = {}
         for topic in zk_dict['topics']:
             topics_to_reassign[topic['name']] = {}
             for partition in topic['partitions']:

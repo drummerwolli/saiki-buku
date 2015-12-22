@@ -20,12 +20,12 @@ SenzaComponents:
         Minimum: 3
         Maximum: 3
         MetricType: CPU
-      HealthCheckType: ELB
+      HealthCheckType: EC2
       ElasticLoadBalancer: AppLoadBalancer
       LoadBalancerNames:
         - Ref: AppLoadBalancer
       BlockDeviceMappings:
-        - DeviceName: /dev/sda1
+        - DeviceName: /dev/xvdk
           Ebs:
             VolumeSize: 500
             VolumeType: gp2
@@ -52,6 +52,12 @@ SenzaComponents:
           ZOOKEEPER_PREFIX: "{{Arguments.ZookeeperPrefix}}"
           JMX_PORT: 8004
           REASSIGN_PARTITIONS: "yes"
+        mounts:
+          /data:
+            partition: /dev/xvdk
+            filesystem: ext4
+            erase_on_boot: true
+            options: noatime,nodiratime,nobarrier
 Resources:
   BukuRole:
     Type: AWS::IAM::Role

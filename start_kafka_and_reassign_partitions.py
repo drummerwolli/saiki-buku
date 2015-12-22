@@ -115,7 +115,8 @@ if os.getenv('REASSIGN_PARTITIONS') == 'yes':
 logging.info("starting kafka server ...")
 os.environ['KAFKA_OPTS'] = "-server " \
                            + "-Dlog4j.configuration=file:" + kafka_dir + "/config/log4j.properties " \
-                           + "-javaagent:/tmp/jolokia-jvm-" + os.getenv('JOLOKIA_VERSION') + "-agent.jar=host=0.0.0.0"
+                           + "-javaagent:/tmp/jolokia-jvm-" + os.getenv('JOLOKIA_VERSION') + "-agent.jar=host=0.0.0.0" \
+                           + " -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=32M"
 # + "-Xmx512M " \
 os.environ['KAFKA_JMX_OPTS'] = "-Dcom.sun.management.jmxremote=true " \
                                + "-Dcom.sun.management.jmxremote.authenticate=false " \

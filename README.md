@@ -19,7 +19,12 @@ Deployment with STUPS toolbox
 
 ###### Create the docker and push
 
-Push your docker image to STUPS ```Pier One```, see here: http://docs.stups.io/en/latest/user-guide/deployment.html#prepare-the-deployment-artifact
+We advise to use the official release in the OpenSource Registry of Zalando. You can find out the latest here:
+```
+curl -s https://registry.opensource.zalan.do/teams/saiki/artifacts/buku/tags | jq "sort_by(.created)"
+```
+
+If you want to build your own image see here: http://docs.stups.io/en/latest/user-guide/deployment.html#prepare-the-deployment-artifact
 
 ###### Register the Buku app in Yourturn/Kio
 

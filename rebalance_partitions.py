@@ -117,9 +117,7 @@ def generate_json(zk_dict, topics_to_reassign="all", target_brokers="all"):
     logging.debug("topics_to_reassign:")
     logging.debug(topics_to_reassign)
 
-    tmp_topic_dict = {}
-    for tmp_topic in zk_dict['topics']:
-        tmp_topic_dict[tmp_topic['name']] = tmp_topic['partitions']
+    tmp_topic_dict = {t['name']: t['partitions'] for t in zk_dict['topics']}
 
     # this is needed for creating new topics (currently in pemetaan)
     for topic_to_reassign, value in topics_to_reassign.items():

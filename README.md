@@ -54,3 +54,34 @@ Your Kafka Producer/Consumer can connect to this Buku cluster with its Route53 D
 
 Check the STUPS documention for additional options:
 http://docs.stups.io
+
+## Additions
+
+There are additional Services running to help us with some tasks:
+
+### Jolokia HTTP Endpoint
+
+to make the JMX metrics available, we included the [Jolokia|https://jolokia.org/] Service as JVM Agent in the startup. You can query the Kafka JMX Metrics on this endpoint:
+
+read
+```
+curl https://instance.example.org:8778/jolokia/read/kafka.server:name=BytesInPerSec,type=BrokerTopicMetrics,topic=topic_name
+```
+
+search
+```
+curl https://instance.example.org:8778/jolokia/search/kafka.*:name=*,type=Broker*
+```
+
+### Additional Health Endpoint
+
+We also need additional Metrics besides the ones JMX offers us. We implemented a custom endpoint to serve these right now.
+
+#### Broken Partitions
+
+This healthcheck simply checks that there are not partitions which are stored on brokers which are not registered in zookeeper. As a result it returns array of "dead broker" id's. If there are no dead brokers array would be empty.
+
+Endpoint:
+```
+curl https://instance.example.org:8080/
+```

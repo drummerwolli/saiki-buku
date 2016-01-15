@@ -61,7 +61,7 @@ There are additional Services running to help us with some tasks:
 
 ### Jolokia HTTP Endpoint
 
-to make the JMX metrics available, we included the [Jolokia](https://jolokia.org/) Service as JVM Agent in the startup. You can query the Kafka JMX Metrics on this endpoint:
+to make the JMX metrics available on a REST endpoint, we included the [Jolokia](https://jolokia.org/) Service as JVM Agent in the startup. You can query the Kafka JMX Metrics on this endpoint:
 
 read
 ```

@@ -1,6 +1,6 @@
 Introduction
 ============
-Buku (javanese for book) is a Kafka Appliance for [STUPS](https://stups.io/).
+Buku (javanese for book) is a [Kafka](http://kafka.apache.org/) Appliance for [STUPS](https://stups.io/).
 
 Buku uses port ```8004``` as ```JMX_PORT```.
 

@@ -55,7 +55,7 @@ Your Kafka Producer/Consumer can connect to this Buku cluster with its Route53 D
 Check the STUPS documention for additional options:
 http://docs.stups.io
 
-## Additions
+## Monitoring / Additions
 
 There are additional Services running to help us with some tasks:
 
@@ -85,3 +85,7 @@ Endpoint:
 ```
 curl https://instance.example.org:8080/
 ```
+
+### LinkedIn's Burrow
+
+For Consumer Offset Monitoring you can find a STUPS appliance for [LinkedIn's](https://www.linkedin.com/) [Burrow](https://github.com/linkedin/Burrow) here: https://github.com/zalando/stups-burrow/

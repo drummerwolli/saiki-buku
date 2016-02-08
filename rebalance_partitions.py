@@ -1,6 +1,6 @@
 from kazoo.client import KazooClient, KazooState, NodeExistsError, NoNodeError
 from time import sleep
-import collections
+from collections import Counter
 import logging
 import json
 import os
@@ -135,7 +135,8 @@ def generate_json(zk_dict, topics_to_reassign="all", target_brokers="all"):
         logging.info("generating now ")
         weights = get_broker_weights(zk_dict, avail_brokers_init, ignore_existing)
         for topic, partitions in topics_to_reassign.items():
-            replication_factor = collections.Counter(map(len, tmp_topic_dict[topic].values())).most_common(1)[0][0]
+            counter = Counter(map(len, tmp_topic_dict[topic].values()))
+            replication_factor = sorted(sorted(counter.items()), key=lambda e: e[1], reverse=True)[0][0]
 
             logging.debug("Available Brokers: %s", len(avail_brokers_init))
             logging.debug("Replication Factor: %s", replication_factor)

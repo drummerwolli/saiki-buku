@@ -136,7 +136,7 @@ def generate_json(zk_dict, topics_to_reassign="all", target_brokers="all"):
         weights = get_broker_weights(zk_dict, avail_brokers_init, ignore_existing)
         for topic, partitions in topics_to_reassign.items():
             counter = Counter(map(len, tmp_topic_dict[topic].values()))
-            replication_factor = sorted(sorted(counter.items()), key=lambda e: e[1], reverse=True)[0][0]
+            replication_factor = sorted(counter.items(), key=lambda e: e[1])[0][0]
 
             logging.debug("Available Brokers: %s", len(avail_brokers_init))
             logging.debug("Replication Factor: %s", replication_factor)

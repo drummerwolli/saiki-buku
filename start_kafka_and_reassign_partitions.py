@@ -127,13 +127,13 @@ kafka_process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
                                   kafka_dir + "/config/server.properties"])
 
 
-ignore_sigterm = False
+__ignore_sigterm = False
 
 
 def sigterm_handler(signo, stack_frame):
-    global ignore_sigterm
-    if not ignore_sigterm:
-        ignore_sigterm = True
+    global __ignore_sigterm
+    if not __ignore_sigterm:
+        __ignore_sigterm = True
         sys.exit()
 
 
@@ -149,5 +149,6 @@ try:
 
     kafka_process.wait()
 finally:
-    if ignore_sigterm:
+    if __ignore_sigterm:
         kafka_process.terminate()
+        kafka_process.wait()

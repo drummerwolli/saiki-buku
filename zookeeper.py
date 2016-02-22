@@ -80,7 +80,7 @@ class Exhibitor:
 
     def _poll_exhibitor(self):
         if self.exhibitor.poll():
-            self.client.set_hosts(self.exhibitor.zookeeper_hosts)
+            self.client.set_hosts(self.exhibitor.zookeeper_hosts + self.chroot)
 
     def get(self, *params):
         self._poll_exhibitor()

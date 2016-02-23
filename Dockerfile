@@ -1,7 +1,7 @@
-FROM zalando/python:3.5.0-3
+FROM registry.opensource.zalan.do/stups/python:3.5.0-7
 MAINTAINER fabian.wollert@zalando.de teng.qiu@zalando.de
 
-ENV KAFKA_VERSION="0.9.0.0" SCALA_VERSION="2.11" JOLOKIA_VERSION="1.3.2"
+ENV KAFKA_VERSION="0.9.0.1" SCALA_VERSION="2.11" JOLOKIA_VERSION="1.3.2"
 ENV KAFKA_TMP_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
 ENV KAFKA_DIR="/opt/kafka"
 

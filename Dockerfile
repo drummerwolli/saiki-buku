@@ -1,4 +1,4 @@
-FROM registry.opensource.zalan.do/stups/python:3.5.0-7
+FROM zalando/python:3.4.0-2
 MAINTAINER fabian.wollert@zalando.de teng.qiu@zalando.de
 
 ENV KAFKA_VERSION="0.9.0.1" SCALA_VERSION="2.11" JOLOKIA_VERSION="1.3.2"
@@ -9,7 +9,7 @@ ENV SERVER_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/mast
 ENV LOG4J_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/log4j.properties"
 
 RUN apt-get update
-RUN apt-get install wget openjdk-8-jre -y --force-yes
+RUN apt-get install wget openjdk-7-jre -y --force-yes
 RUN pip3 install --upgrade kazoo boto3
 
 ADD download_kafka.sh /tmp/download_kafka.sh

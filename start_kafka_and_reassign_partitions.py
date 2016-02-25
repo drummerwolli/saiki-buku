@@ -74,14 +74,19 @@ def check_broker_id_in_zk(broker_id, process):
         new_zk_conn_str = generate_zk_conn_str.run(os.getenv('ZOOKEEPER_STACK_NAME'), region)
         if zk_conn_str != new_zk_conn_str:
             logging.warning("ZooKeeper connection string changed!")
+            logging.warning("new ZK: " + new_zk_conn_str)
+            logging.warning("old ZK: " + zk_conn_str)
             zk_conn_str = new_zk_conn_str
             os.environ['ZOOKEEPER_CONN_STRING'] = zk_conn_str
             create_broker_properties(zk_conn_str)
             from random import randint
-            wait_to_restart = randint(1, 20)
+            wait_to_kill = randint(1, 10)
+            logging.info("Waiting " + str(wait_to_kill) + " seconds to kill kafka broker ...")
+            sleep(wait_to_kill)
+            process.kill()
+            wait_to_restart = randint(10, 20)
             logging.info("Waiting " + str(wait_to_restart) + " seconds to restart kafka broker ...")
             sleep(wait_to_restart)
-            process.kill()
             logging.info("Restarting kafka broker with new ZooKeeper connection string ...")
             process = subprocess.Popen([kafka_dir
                                         + "/bin/kafka-server-start.sh", kafka_dir

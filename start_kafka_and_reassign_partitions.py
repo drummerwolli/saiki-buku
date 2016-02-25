@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""General Kafka Start Script."""
 
 import subprocess
 import os
@@ -34,6 +35,7 @@ logging.info("Got ZooKeeper connection string: " + zk_conn_str)
 
 
 def get_remote_config(file, url):
+    """Get a config from a remote location (e.g. Github)."""
     logging.info("getting " + file + " file from " + url)
     file_ = open(file, 'w')
     file_.write(requests.get(url).text)
@@ -41,6 +43,7 @@ def get_remote_config(file, url):
 
 
 def create_broker_properties(zk_conn_str):
+    """Write the zookeeper connection string into the server.properties."""
     with open(kafka_dir + '/config/server.properties', "r+") as f:
         lines = f.read().splitlines()
         f.seek(0)
@@ -61,6 +64,13 @@ broker_id = find_out_own_id.run()
 
 
 def check_broker_id_in_zk(broker_id, process):
+    """
+    Check endlessly for the Zookeeper Connection.
+
+    This function checks endlessly if the broker is still registered in ZK
+    (we observered running brokers but missing broker id's so we implemented this check)
+    and if the ZK IP's changed (e.g. due to a node restart). If this happens a Kafka restart is enforced.
+    """
     import requests
     from time import sleep
     from kazoo.client import KazooClient
@@ -88,9 +98,8 @@ def check_broker_id_in_zk(broker_id, process):
             logging.info("Waiting " + str(wait_to_restart) + " seconds to restart kafka broker ...")
             sleep(wait_to_restart)
             logging.info("Restarting kafka broker with new ZooKeeper connection string ...")
-            process = subprocess.Popen([kafka_dir
-                                        + "/bin/kafka-server-start.sh", kafka_dir
-                                        + "/config/server.properties"])
+            process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
+                                        kafka_dir + "/config/server.properties"])
             os.environ['WAIT_FOR_KAFKA'] = 'yes'
             continue
 
@@ -106,9 +115,8 @@ def check_broker_id_in_zk(broker_id, process):
             zk.stop()
             process.kill()
             logging.info("Restarting kafka broker ...")
-            process = subprocess.Popen([kafka_dir
-                                        + "/bin/kafka-server-start.sh", kafka_dir
-                                        + "/config/server.properties"])
+            process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
+                                        kafka_dir + "/config/server.properties"])
             os.environ['WAIT_FOR_KAFKA'] = 'yes'
 
 HealthServer().start()
@@ -136,6 +144,7 @@ __ignore_sigterm = False
 
 
 def sigterm_handler(signo, stack_frame):
+    """Well yeah, what is this function doing?."""
     global __ignore_sigterm
     if not __ignore_sigterm:
         __ignore_sigterm = True

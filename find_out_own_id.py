@@ -23,10 +23,10 @@ def run():
     config_file = os.getenv('KAFKA_DIR') + '/config/server.properties'
     url = 'http://169.254.169.254/latest/dynamic/instance-identity/document'
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         json = response.json()
         myid = json['privateIp'].rsplit(".", 1)[1]
-    except requests.exceptions.ConnectionError:
+    except:
         myid = "1"
 
     broker_unique_id = get_broker_unique_id(myid)

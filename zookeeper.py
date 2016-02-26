@@ -46,6 +46,8 @@ class ExhibitorEnsembleProvider:
         return False
 
     def _query_exhibitors(self, exhibitors):
+        if exhibitors == [None]:
+            return {'servers': ['localhost'], 'port': 2181}
         random.shuffle(exhibitors)
         for host in exhibitors:
             uri = 'http://{}:{}{}'.format(host, self._exhibitor_port, self._uri_path)
@@ -95,4 +97,4 @@ class Exhibitor:
 
 
 def get_zookeeper():
-    return Exhibitor({'hosts': [os.getenv('EXHIBITOR_HOST')], 'port': 8181}, os.getenv('ZOOKEEPER_PREFIX'))
+    return Exhibitor({'hosts': [os.getenv('EXHIBITOR_HOST')], 'port': 8181}, os.getenv('ZOOKEEPER_PREFIX', '/'))

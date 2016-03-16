@@ -8,6 +8,8 @@ ENV KAFKA_DIR="/opt/kafka"
 ENV SERVER_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/server.properties"
 ENV LOG4J_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/log4j.properties"
 
+ENV HEALTH_SERVER_PORT=${HEALTH_SERVER_PORT:-8080}
+
 RUN apt-get update
 RUN apt-get install wget openjdk-7-jre -y --force-yes
 RUN pip3 install --upgrade kazoo boto3
@@ -46,4 +48,5 @@ RUN chmod 777 /tmp/tail_logs_and_start.sh
 
 ENTRYPOINT ["/bin/bash", "/tmp/tail_logs_and_start.sh"]
 
-EXPOSE 9092 8004 8080
+EXPOSE 9092 8004 ${HEALTH_SERVER_PORT}
+

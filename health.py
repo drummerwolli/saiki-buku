@@ -2,6 +2,7 @@ import fcntl
 import json
 import time
 
+from os import getenv
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from threading import Thread
@@ -21,7 +22,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 class HealthServer(ThreadingMixIn, HTTPServer, Thread):
 
     def __init__(self):
-        HTTPServer.__init__(self, ('0.0.0.0', 8080), HealthHandler)
+        HTTPServer.__init__(self, ('0.0.0.0', int(getenv('HEALTH_SERVER_PORT'))), HealthHandler)
         Thread.__init__(self, target=self.serve_forever)
         self._set_fd_cloexec(self.socket)
         self.zk = get_zookeeper()

@@ -17,7 +17,7 @@ For local test, ```ZOOKEEPER_STACK_NAME``` should be set to the DNS name or IP a
 Deployment with STUPS toolbox
 -----------------------------
 
-###### Create the docker and push
+###### Docker Image
 
 We advise to use the official release in the OpenSource Registry of Zalando. You can find out the latest here:
 ```

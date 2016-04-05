@@ -8,7 +8,15 @@ Usage
 =====
 After building the docker image, start Buku like this:
 ```
-sudo docker run -d -e ZOOKEEPER_STACK_NAME=localhost -e JMX_PORT=8004 -p 8004:8004 -p 9092:9092 --net=host <IMAGE_ID>
+docker run -d \
+  -e ZOOKEEPER_STACK_NAME=localhost \
+  -e JMX_PORT=8004 \
+  -e EXHIBITOR_HOST=localhost \
+  -e ZOOKEEPER_PREFIX=/buku \
+  -p 8004:8004 \
+  -p 9092:9092 \
+  --net=host \
+  <IMAGE_ID>
 ```
 Docker run option ```--net=host``` is needed, so kafka can bind the interface from the host, to listen for leader elections. Ref. https://docs.docker.com/articles/networking/#how-docker-networks-a-container
 

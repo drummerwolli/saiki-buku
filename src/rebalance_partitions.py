@@ -1,10 +1,10 @@
-from kazoo.client import KazooClient, KazooState, NodeExistsError, NoNodeError
-from time import sleep
-from collections import Counter
-import logging
 import json
+import logging
 import os
+from collections import Counter
+from time import sleep
 
+from kazoo.client import KazooClient, KazooState, NodeExistsError, NoNodeError
 from kazoo.protocol.states import EventType
 
 

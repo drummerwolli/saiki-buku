@@ -1,11 +1,12 @@
 import fcntl
 import json
 import time
-
-from os import getenv
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from os import getenv
 from socketserver import ThreadingMixIn
 from threading import Thread
+
+
 from kazoo.exceptions import NoNodeError
 from zookeeper import get_zookeeper
 

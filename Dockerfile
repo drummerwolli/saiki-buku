@@ -1,17 +1,17 @@
-FROM zalando/python:3.4.0-2
+FROM zalando/python:3.5.0-4
 MAINTAINER fabian.wollert@zalando.de teng.qiu@zalando.de
 
 ENV KAFKA_VERSION="0.9.0.1" SCALA_VERSION="2.11" JOLOKIA_VERSION="1.3.3"
 ENV KAFKA_TMP_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
 ENV KAFKA_DIR="/opt/kafka"
 
-ENV SERVER_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/server.properties"
-ENV LOG4J_PROPERTIES="https://raw.githubusercontent.com/zalando/saiki-buku/master/log4j.properties"
+ENV CONFIG_PATHS="https://raw.githubusercontent.com/zalando/saiki-buku/master"
+ENV SERVER_PROPERTIES="${CONFIG_PATHS}/server.properties"
+ENV LOG4J_PROPERTIES="${CONFIG_PATHS}/log4j.properties"
 
 ENV HEALTH_SERVER_PORT=${HEALTH_SERVER_PORT:-8080}
 
-RUN apt-get update
-RUN apt-get install wget openjdk-7-jre -y --force-yes
+RUN apt-get update && apt-get install wget openjdk-8-jre -y --force-yes && apt-get clean
 RUN pip3 install --upgrade kazoo boto3
 
 ADD download_kafka.sh /tmp/download_kafka.sh
@@ -26,19 +26,12 @@ RUN chmod -R 777 /data/kafka-logs
 
 RUN wget -O /tmp/jolokia-jvm-$JOLOKIA_VERSION-agent.jar http://search.maven.org/remotecontent?filepath=org/jolokia/jolokia-jvm/$JOLOKIA_VERSION/jolokia-jvm-$JOLOKIA_VERSION-agent.jar
 
-ADD find_out_own_id.py /tmp/find_out_own_id.py
-
 RUN mkdir -p $KAFKA_DIR/logs/
 
 RUN chmod -R 777 $KAFKA_DIR
 WORKDIR $KAFKA_DIR
 
-ADD start_kafka_and_reassign_partitions.py /tmp/start_kafka_and_reassign_partitions.py
-ADD rebalance_partitions.py /tmp/rebalance_partitions.py
-ADD wait_for_kafka_startup.py /tmp/wait_for_kafka_startup.py
-ADD generate_zk_conn_str.py /tmp/generate_zk_conn_str.py
-ADD zookeeper.py /tmp/zookeeper.py
-ADD health.py /tmp/health.py
+COPY src/. /tmp/
 RUN chmod 777 /tmp/start_kafka_and_reassign_partitions.py
 
 ADD scm-source.json /scm-source.json

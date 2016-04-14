@@ -24,6 +24,7 @@ RUN mv $KAFKA_TMP_DIR $KAFKA_DIR
 RUN mkdir -p /data/kafka-logs
 RUN chmod -R 777 /data/kafka-logs
 
+ENV USE_JOLOKIA="yes"
 RUN wget -O /tmp/jolokia-jvm-$JOLOKIA_VERSION-agent.jar http://search.maven.org/remotecontent?filepath=org/jolokia/jolokia-jvm/$JOLOKIA_VERSION/jolokia-jvm-$JOLOKIA_VERSION-agent.jar
 
 RUN mkdir -p $KAFKA_DIR/logs/

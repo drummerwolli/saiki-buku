@@ -2,3 +2,4 @@
 scm-source.json
 buku-dev.yaml
 local_deploy.sh
+.idea*

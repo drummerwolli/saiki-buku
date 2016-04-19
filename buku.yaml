@@ -3,14 +3,12 @@ SenzaInfo:
   Parameters:
     - DockerImage:
         Description: "Docker image path with version tag of buku."
-    - MintBucket:
-        Description: "Mint Bucket of buku."
     - ScalyrAccountKey:
         Description: "Scalyr Account Key, necessary for Logging."
-    - ApplicationID:
-        Description: "The Application Id which got registered for buku in Yourturn/Kio."
-    - ZookeeperConnectionString:
-        Description: "Which ZooKeeper Cluster should be used? Format: IP_NODE1:PORT,IP_NODE2:PORT, ... or DNS record and ZooKeeper port of Exhibitor Cluster, e.g.: exhibitor.example.org:2181"
+    - ZookeeperStackName:
+        Description: "Which ZooKeeper Stack should be used?"
+    - ZookeeperPrefix:
+        Description: "Which ZooKeeper node should be used as prefix?"
     - HostedZone:
         Description: "The generic Hosted Zone for your AWS account"
 SenzaComponents:
@@ -22,41 +20,45 @@ SenzaComponents:
         Minimum: 3
         Maximum: 3
         MetricType: CPU
-      HealthCheckType: ELB
+      HealthCheckType: EC2
       ElasticLoadBalancer: AppLoadBalancer
       LoadBalancerNames:
         - Ref: AppLoadBalancer
       BlockDeviceMappings:
         - DeviceName: /dev/xvdk
           Ebs:
-            VolumeSize: 80
-      InstanceType: t2.medium
+            VolumeSize: 500
+            VolumeType: gp2
+      InstanceType: c4.xlarge
       SecurityGroups:
         - "Fn::GetAtt" : [ "BukuSecGroup" , "GroupId" ]
       IamRoles:
         - Ref: BukuRole
       TaupageConfig:
-        application_id: "{{Arguments.ApplicationID}}"
         runtime: Docker
         source: "{{Arguments.DockerImage}}"
         ports:
           9092: 9092
           8004: 8004
-        mint_bucket: '{{Arguments.MintBucket}}'
+          8080: 8080
+          8778: 8778
         scalyr_account_key: '{{Arguments.ScalyrAccountKey}}'
         networking: host
+        enhanced_cloudwatch_metrics: true
+        application_logrotate_size: 100M
+        application_logrotate_rotate: 4
+        environment:
+          EXHIBITOR_HOST: "{{Arguments.ZookeeperStackName}}.{{Arguments.HostedZone}}"
+          ZOOKEEPER_STACK_NAME: "{{Arguments.ZookeeperStackName}}"
+          ZOOKEEPER_PREFIX: "{{Arguments.ZookeeperPrefix}}"
+          JMX_PORT: 8004
+          REASSIGN_PARTITIONS: "yes"
         mounts:
           /data:
             partition: /dev/xvdk
-            erase_on_boot: true
             filesystem: ext4
-        environment:
-          ZOOKEEPER_CONN_STRING: "{{Arguments.ZookeeperConnectionString}}"
-          JMX_PORT: 8004
-          REASSIGN_PARTITIONS: "yes"
-          SCALYR_ACCOUNT_KEY: '{{Arguments.ScalyrAccountKey}}'
-          SCALYR_LOGS: '/opt/kafka_2.10-0.8.2.1/logs/controller.log,/opt/kafka_2.10-0.8.2.1/logs/kafka-request.log,/opt/kafka_2.10-0.8.2.1/logs/kafkaServer-gc.log,/opt/kafka_2.10-0.8.2.1/logs/log-cleaner.log,/opt/kafka_2.10-0.8.2.1/logs/server.log,/opt/kafka_2.10-0.8.2.1/logs/state-change.log'
-
+            erase_on_boot: true
+            options: noatime,nodiratime,nobarrier
 Resources:
   BukuRole:
     Type: AWS::IAM::Role
@@ -70,13 +72,6 @@ Resources:
           Action: sts:AssumeRole
       Path: /
       Policies:
-      - PolicyName: AmazonS3MintBucketAccess
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-          - Effect: Allow
-            Action: "s3:GetObject"
-            Resource: ["arn:aws:s3:::{{Arguments.MintBucket}}/{{Arguments.ApplicationID}}/*"]
       - PolicyName: AmazonEC2MetadataReadAccess
         PolicyDocument:
           Version: "2012-10-17"
@@ -85,7 +80,14 @@ Resources:
             Action: ec2:Describe*
             Resource: "*"
           - Effect: Allow
-            Action: autoscaling:Describe*
+            Action: elasticloadbalancing:Describe*
+            Resource: "*"
+      - PolicyName: WriteZMONMetricsIntoCloudWatch
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action: "cloudwatch:PutMetricData"
             Resource: "*"
   BukuSecGroup:
     Type: AWS::EC2::SecurityGroup
@@ -101,10 +103,22 @@ Resources:
           ToPort: 8004
           CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 8778
+          ToPort: 8778
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: "0.0.0.0/0"
-  Route53Record:
+        - IpProtocol: tcp
+          FromPort: 9100
+          ToPort: 9100
+          CidrIp: "0.0.0.0/0"
+  Route53WeightedDomainRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneName: "{{Arguments.HostedZone}}"
@@ -117,7 +131,7 @@ Resources:
         - Fn::GetAtt:
            - AppLoadBalancer
            - DNSName
-  Route53Record:
+  Route53VersionedDomainRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneName: "{{Arguments.HostedZone}}"
@@ -138,7 +152,7 @@ Resources:
         Timeout: 5
         Interval: 30
         UnhealthyThreshold: 2
-        HealthyThreshold: 5
+        HealthyThreshold: 3
       Listeners:
         - InstancePort: 9092
           LoadBalancerPort: 9092
@@ -146,6 +160,14 @@ Resources:
           InstanceProtocol: TCP
         - InstancePort: 8004
           LoadBalancerPort: 8004
+          Protocol: TCP
+          InstanceProtocol: TCP
+        - InstancePort: 8080
+          LoadBalancerPort: 8080
+          Protocol: TCP
+          InstanceProtocol: TCP
+        - InstancePort: 8778
+          LoadBalancerPort: 8778
           Protocol: TCP
           InstanceProtocol: TCP
       SecurityGroups:

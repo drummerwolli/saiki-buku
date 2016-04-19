@@ -1,48 +1,46 @@
-FROM zalando/python:3.4.0-1
+FROM registry.opensource.zalan.do/stups/python:3.5.0-12
 MAINTAINER fabian.wollert@zalando.de teng.qiu@zalando.de
 
-ENV KAFKA_VERSION="0.8.2.1" SCALA_VERSION="2.10"
-ENV KAFKA_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
+ENV KAFKA_VERSION="0.9.0.1" SCALA_VERSION="2.11" JOLOKIA_VERSION="1.3.3"
+ENV KAFKA_TMP_DIR="/opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
+ENV KAFKA_DIR="/opt/kafka"
 
-RUN apt-get update
-RUN apt-get install wget openjdk-7-jre -y --force-yes
-RUN pip3 install --upgrade kazoo
+ENV CONFIG_PATHS="https://raw.githubusercontent.com/zalando/saiki-buku/master"
+ENV SERVER_PROPERTIES="${CONFIG_PATHS}/server.properties"
+ENV LOG4J_PROPERTIES="${CONFIG_PATHS}/log4j.properties"
+
+ENV HEALTH_SERVER_PORT=${HEALTH_SERVER_PORT:-8080}
+
+RUN apt-get update && apt-get install wget openjdk-8-jre -y --force-yes && apt-get clean
+RUN pip3 install --upgrade kazoo boto3
 
 ADD download_kafka.sh /tmp/download_kafka.sh
 RUN chmod 777 /tmp/download_kafka.sh
 
 RUN /tmp/download_kafka.sh
 RUN tar xf /tmp/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz -C /opt
-
-ADD server.properties $KAFKA_DIR/config/server.properties
-ADD log4j.properties $KAFKA_DIR/config/log4j.properties
+RUN mv $KAFKA_TMP_DIR $KAFKA_DIR
 
 RUN mkdir -p /data/kafka-logs
 RUN chmod -R 777 /data/kafka-logs
 
-ADD find_out_own_id.py /tmp/find_out_own_id.py
-#RUN python3 /tmp/find_out_own_id.py -f $KAFKA_DIR/config/server.properties
+ENV USE_JOLOKIA="yes"
+RUN wget -O /tmp/jolokia-jvm-$JOLOKIA_VERSION-agent.jar http://search.maven.org/remotecontent?filepath=org/jolokia/jolokia-jvm/$JOLOKIA_VERSION/jolokia-jvm-$JOLOKIA_VERSION-agent.jar
+
+RUN mkdir -p $KAFKA_DIR/logs/
 
 RUN chmod -R 777 $KAFKA_DIR
 WORKDIR $KAFKA_DIR
 
-ADD start_kafka_and_reassign_partitions.py /tmp/start_kafka_and_reassign_partitions.py
-ADD rebalance_partitions.py /tmp/rebalance_partitions.py
-ADD wait_for_kafka_startup.py /tmp/wait_for_kafka_startup.py
+COPY src/. /tmp/
 RUN chmod 777 /tmp/start_kafka_and_reassign_partitions.py
 
-# SCALYR INSTALLATION
-RUN apt-get update 
-RUN apt-get install -y --force-yes wget apt-transport-https python
-RUN wget -q https://www.scalyr.com/scalyr-repo/stable/latest/scalyr-agent-2.0.11.tar.gz
-RUN tar -zxf scalyr-agent-2.0.11.tar.gz -C /tmp
-RUN rm scalyr-agent-2.0.11.tar.gz
-ENV PATH=/tmp/scalyr-agent-2.0.11/bin:$PATH
-RUN chmod -R 777 /tmp/scalyr-agent-2.0.11/
+ADD scm-source.json /scm-source.json
 
-ADD scalyr_startup.sh /tmp/scalyr_startup.sh
-RUN chmod 777 /tmp/scalyr_startup.sh
+ADD tail_logs_and_start.sh /tmp/tail_logs_and_start.sh
+RUN chmod 777 /tmp/tail_logs_and_start.sh
 
-CMD /tmp/scalyr_startup.sh && /usr/bin/env python3 -u /tmp/start_kafka_and_reassign_partitions.py
+ENTRYPOINT ["/bin/bash", "/tmp/tail_logs_and_start.sh"]
 
-EXPOSE 9092 8004
+EXPOSE 9092 8004 ${HEALTH_SERVER_PORT}
+

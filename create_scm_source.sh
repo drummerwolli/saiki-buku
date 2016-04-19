@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# from http://stups.readthedocs.org/en/latest/user-guide/application-development.html
+
+REV=$(git rev-parse HEAD)
+URL=$(git config --get remote.origin.url)
+STATUS=$(git status --porcelain)
+if [ -n "$STATUS" ]; then
+    REV="$REV (locally modified)"
+fi
+# finally write hand-crafted JSON to scm-source.json
+echo '{"url": "git:'$URL'", "revision": "'$REV'", "author": "'$USER'", "status": "'$STATUS'"}' > scm-source.json

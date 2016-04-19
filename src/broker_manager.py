@@ -1,6 +1,8 @@
 import logging
 import os
 import subprocess
+from time import sleep
+from kazoo.client import KazooClient
 
 import generate_zk_conn_str
 import wait_for_kafka_startup
@@ -23,6 +25,25 @@ def create_broker_properties(zk_conn_str):
     logging.info("Broker properties generated with zk connection str: " + zk_conn_str)
 
 
+def restart_kafka(process, zk_conn_str, broker_id):
+    zk = KazooClient(hosts=zk_conn_str)
+    zk.start()
+    logging.info("Waiting for ZK lock to restart kafka ...")
+    restart_lock = zk.Lock("/restart_lockpath", broker_id)
+    with restart_lock:
+        logging.info("acquired ZK lock to restart kafka, continuing ...")
+        process.terminate()
+        process.wait()
+
+        logging.info("Restarting kafka broker ...")
+        process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
+                                    kafka_dir + "/config/server.properties"])
+        os.environ['WAIT_FOR_KAFKA'] = 'yes'
+
+        zk.close()
+        return process
+
+
 def check_broker_id_in_zk(broker_id, process, region):
     """
     Check endlessly for the Zookeeper Connection.
@@ -31,8 +52,6 @@ def check_broker_id_in_zk(broker_id, process, region):
     (we observered running brokers but missing broker id's so we implemented this check)
     and if the ZK IP's changed (e.g. due to a node restart). If this happens a Kafka restart is enforced.
     """
-    from time import sleep
-    from kazoo.client import KazooClient
     zk_conn_str = os.getenv('ZOOKEEPER_CONN_STRING')
     logging.info("check broker id...")
     while True:
@@ -47,21 +66,7 @@ def check_broker_id_in_zk(broker_id, process, region):
             os.environ['ZOOKEEPER_CONN_STRING'] = zk_conn_str
             create_broker_properties(zk_conn_str)
 
-            zk = KazooClient(hosts=zk_conn_str)
-            zk.start()
-            logging.info("Waiting for ZK lock to restart kafka ...")
-            restart_lock = zk.Lock("/restart_lockpath", broker_id)
-            with restart_lock:
-                logging.info("acquired ZK lock to restart kafka, continuing ...")
-                process.terminate()
-                process.wait()
-
-                logging.info("Restarting kafka broker with new ZooKeeper connection string ...")
-                process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
-                                            kafka_dir + "/config/server.properties"])
-                os.environ['WAIT_FOR_KAFKA'] = 'yes'
-                continue
-            zk.close()
+            restart_kafka(process, zk_conn_str, broker_id)
 
         zk = KazooClient(hosts=zk_conn_str)
         zk.start()
@@ -73,12 +78,7 @@ def check_broker_id_in_zk(broker_id, process, region):
         except:
             logging.warning("I'm not in ZK registered, stopping kafka broker process!")
             zk.stop()
-            process.terminate()
-            process.wait()
-            logging.info("Restarting kafka broker ...")
-            process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
-                                        kafka_dir + "/config/server.properties"])
-            os.environ['WAIT_FOR_KAFKA'] = 'yes'
+            restart_kafka(process, zk_conn_str, broker_id)
 
 
 def check_kafka():

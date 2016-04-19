@@ -47,10 +47,11 @@ def check_broker_id_in_zk(broker_id, process, region):
             os.environ['ZOOKEEPER_CONN_STRING'] = zk_conn_str
             create_broker_properties(zk_conn_str)
             from random import randint
-            wait_to_kill = randint(1, 10)
-            logging.info("Waiting " + str(wait_to_kill) + " seconds to kill kafka broker ...")
-            sleep(wait_to_kill)
-            process.kill()
+            wait_to_stop = randint(1, 10)
+            logging.info("Waiting " + str(wait_to_stop) + " seconds to stop kafka broker ...")
+            sleep(wait_to_stop)
+            process.terminate()
+            process.wait()
             wait_to_restart = randint(10, 20)
             logging.info("Waiting " + str(wait_to_restart) + " seconds to restart kafka broker ...")
             sleep(wait_to_restart)
@@ -68,9 +69,10 @@ def check_broker_id_in_zk(broker_id, process, region):
             sleep(60)
             zk.stop()
         except:
-            logging.warning("I'm not in ZK registered, killing kafka broker process!")
+            logging.warning("I'm not in ZK registered, stopping kafka broker process!")
             zk.stop()
-            process.kill()
+            process.terminate()
+            process.wait()
             logging.info("Restarting kafka broker ...")
             process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
                                         kafka_dir + "/config/server.properties"])

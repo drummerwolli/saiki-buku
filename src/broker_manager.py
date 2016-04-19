@@ -67,6 +67,7 @@ def check_broker_id_in_zk(broker_id, process, region):
             create_broker_properties(zk_conn_str)
 
             restart_kafka(process, zk_conn_str, broker_id)
+            continue
 
         zk = KazooClient(hosts=zk_conn_str)
         zk.start()

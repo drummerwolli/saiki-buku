@@ -39,7 +39,9 @@ def restart_kafka(process, zk_conn_str, broker_id):
         process = subprocess.Popen([kafka_dir + "/bin/kafka-server-start.sh",
                                     kafka_dir + "/config/server.properties"])
         os.environ['WAIT_FOR_KAFKA'] = 'yes'
+        logging.info("Waiting for Kafka to start up again.")
         check_kafka()
+        logging.info("Kafka has started up, releasing ZK lock.")
 
         zk.close()
         return process

@@ -43,6 +43,7 @@ def restart_kafka(process, zk_conn_str, broker_id):
         check_kafka()
         logging.info("Kafka has started up, releasing ZK lock.")
 
+        zk.stop()
         zk.close()
         return process
 
@@ -79,9 +80,11 @@ def check_broker_id_in_zk(broker_id, process, region):
             logging.info("I'm still in ZK registered, all good!")
             sleep(60)
             zk.stop()
+            zk.close()
         except:
             logging.warning("I'm not in ZK registered, stopping kafka broker process!")
             zk.stop()
+            zk.close()
             restart_kafka(process, zk_conn_str, broker_id)
 
 

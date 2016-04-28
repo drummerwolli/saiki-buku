@@ -26,6 +26,7 @@ def create_broker_properties(zk_conn_str):
 
 
 def restart_kafka(process, zk_conn_str, broker_id):
+    """Restart the kafka process, if no other broker is currently restarting (ZooKeeper lock)."""
     zk = KazooClient(hosts=zk_conn_str)
     zk.start()
     logging.info("Waiting for ZK lock to restart kafka ...")
